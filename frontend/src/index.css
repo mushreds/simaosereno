@@ -1,0 +1,121 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Source+Sans+3:wght@300;400;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Cores Primárias do Manual */
+  --color-brand-black: #0F1010;
+  --color-brand-gray-500: #878888;
+  --color-brand-gray-50: #F6F7F7;
+  
+  /* Cores Secundárias - Azul Escuro */
+  --color-sec-blue-900: #151E2A;
+  --color-sec-blue-800: #363F4C;
+  --color-sec-blue-300: #D3DDEE;
+  
+  /* Cores Secundárias - Bege/Marrom */
+  --color-sec-brown-900: #2A2115;
+  --color-sec-brown-600: #817566;
+  --color-sec-brown-400: #CABDAD;
+  --color-sec-brown-100: #FFF3E3;
+
+  /* Mapeamento de Estilo do Dashboard */
+  --color-bg-primary: #0F1010;
+  --color-bg-secondary: #14171B; /* Mix suave de Black e Blue-900 */
+  --color-bg-tertiary: #1E232A;
+  --color-border-card: #24282F;
+  
+  /* Destaque Principal (Bege/Dourado da Marca) */
+  --color-gold-primary: #817566;
+  --color-gold-hover: #AB9E8F;
+  --color-gold-dark: #2A2115;
+  --color-gold-bg: rgba(129, 117, 102, 0.1);
+  --color-gold-border: rgba(129, 117, 102, 0.25);
+  
+  --color-text-primary: #F6F7F7;
+  --color-text-secondary: #A8A9A9;
+  --color-text-muted: #686868;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #0F1010;
+  color: #F6F7F7;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Tipografia de Uso Institucional */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+span, p, button, input, select {
+  font-family: 'Source Sans 3', sans-serif;
+}
+
+/* Números das Métricas - IBM Plex Mono (Premium) */
+.mono-numbers {
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: -0.05em;
+}
+
+/* Forçar visualização Landscape em TVs */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar minimalista */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0F1010;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #24282F;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #817566;
+}
+
+/* Efeitos e Gradientes do Manual */
+.gold-glow {
+  box-shadow: 0 0 15px rgba(129, 117, 102, 0.15);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #AB9E8F 0%, #817566 100%);
+}
+
+.card-gold-gradient {
+  background: linear-gradient(180deg, #1C1712 0%, #0F1010 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #FFF3E3 0%, #AB9E8F 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Utilitário para ocultar barra de rolagem mantendo a funcionalidade */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE/Edge */
+  scrollbar-width: none;  /* Firefox */
+}
