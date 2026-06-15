@@ -1,12 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npm install --prefix frontend && npm run build --prefix frontend",
-  "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
+  "buildCommand": "npm install && npm install --prefix frontend && npm run build --prefix frontend && cp -r frontend/dist/. public",
   "rewrites": [
     {
       "source": "/api/(.*)",
