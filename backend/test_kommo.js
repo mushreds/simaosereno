@@ -46,11 +46,9 @@ async function runTest() {
     const customFields = cfRes.data?._embedded?.custom_fields || [];
     console.log(`Encontrados ${customFields.length} campos personalizados:`);
     customFields.forEach(f => {
-      if (f.name.toLowerCase().includes('consulta') || f.name.toLowerCase().includes('cirurgia') || f.name.toLowerCase().includes('tipo') || f.name.toLowerCase().includes('formul') || f.name.toLowerCase().includes('origem') || f.name.toLowerCase().includes('vendedor')) {
-        console.log(`- Campo [${f.id}]: "${f.name}" (${f.type})`);
-        if (f.enums) {
-          console.log("  Opções:", f.enums);
-        }
+      console.log(`- Campo [${f.id}]: "${f.name}" (${f.type})`);
+      if (f.enums) {
+        console.log("  Opções:", f.enums);
       }
     });
 

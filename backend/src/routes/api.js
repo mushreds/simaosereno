@@ -1,6 +1,7 @@
 import express from 'express';
 import NodeCache from 'node-cache';
 import * as kommoService from '../services/kommoService.js';
+import * as metaAdsService from '../services/metaAdsService.js';
 
 const router = express.Router();
 
@@ -957,23 +958,179 @@ function getMetaAdsMockData(startDateStr, endDateStr) {
 }
 
 /**
- * Endpoint para obter métricas do Meta Ads (Simulado)
+ * Endpoint para obter métricas do Meta Ads (Integração Real com Fallback para Mock)
  */
-router.get('/metrics/meta-ads', (req, res) => {
+router.get('/metrics/meta-ads', async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     
-    const cacheKey = `meta_ads_${startDate || 'default'}_${endDate || 'default'}`;
-    let data = apiCache.get(cacheKey);
-    
-    if (!data) {
-      data = getMetaAdsMockData(startDate, endDate);
-      apiCache.set(cacheKey, data);
+    // Configurar datas padrões se vazias (mês atual dinâmico)
+    let start = startDate;
+    let end = endDate;
+    if (!start || !end) {
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const formatDate = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+      start = formatDate(firstDay);
+      end = formatDate(lastDay);
     }
-    
-    res.json(data);
+
+    const cacheKey = `meta_ads_real_${start}_${end}`;
+    let cachedData = apiCache.get(cacheKey);
+    if (cachedData) {
+      console.log('Returning cached real Meta Ads data...');
+      return res.json(cachedData);
+    }
+
+    console.log(`Fetching real Meta Ads data from ${start} to ${end}...`);
+    const metaData = await metaAdsService.getCampaignsInsights(start, end);
+
+    // Se a API da Meta não retornou dados (ex: sem token, conta vazia ou erro), usamos o Mock como fallback
+    if (!metaData || !metaData.insightsData || metaData.insightsData.length === 0) {
+      console.warn('No real Meta Ads campaigns retrieved. Falling back to dynamic Mock Data...');
+      const fallbackData = getMetaAdsMockData(start, end);
+      apiCache.set(cacheKey, fallbackData);
+      return res.json(fallbackData);
+    }
+
+    // 2. Buscar leads do Kommo no mesmo período para cruzar as conversões
+    const startTimestamp = Math.floor(new Date(`${start}T00:00:00`).getTime() / 1000);
+    const endTimestamp = Math.floor(new Date(`${end}T23:59:59`).getTime() / 1000);
+    const filterParams = {
+      'filter[created_at][from]': startTimestamp,
+      'filter[created_at][to]': endTimestamp
+    };
+    const leads = await kommoService.getLeads(filterParams);
+
+    // 3. Cruzamento de dados (leads Kommo do campo utm_campaign [ID: 703812] com nome/ID do FB)
+    const campaignsMap = metaData.campaignsMeta.reduce((acc, c) => {
+      acc[c.id] = c;
+      return acc;
+    }, {});
+
+    let totalSpend = 0;
+    let totalImpressions = 0;
+    let totalClicks = 0;
+    let totalLeadsCount = 0;
+    let totalConversionsCount = 0;
+    let totalVgvSum = 0;
+
+    const campaigns = metaData.insightsData.map(insight => {
+      const campaignId = insight.campaign_id;
+      const campaignName = insight.campaign_name;
+      const metaInfo = campaignsMap[campaignId];
+
+      const spend = parseFloat(insight.spend || 0);
+      const impressions = parseInt(insight.impressions || 0, 10);
+      const clicks = parseInt(insight.clicks || 0, 10);
+      const ctr = parseFloat(insight.ctr || 0);
+      const cpc = parseFloat(insight.cpc || 0);
+      const cpm = parseFloat(insight.cpm || 0);
+      const reach = parseInt(insight.reach || 0, 10);
+      const frequency = parseFloat(insight.frequency || 0);
+
+      // Encontrar leads do Kommo correspondentes a essa campanha
+      // Comparamos o campo personalizado utm_campaign (ID: 703812) com o nome ou ID da campanha do Facebook
+      const matchingLeads = leads.filter(l => {
+        const utmCampaignField = l.custom_fields_values?.find(cf => cf.field_id === 703812);
+        const utmValue = utmCampaignField?.values?.[0]?.value || '';
+        return utmValue.toLowerCase() === campaignName.toLowerCase() || utmValue === campaignId;
+      });
+
+      const leadsCount = matchingLeads.length;
+      const conversionsCount = matchingLeads.filter(l => String(l.status_id) === '142').length;
+      const vgvSum = matchingLeads
+        .filter(l => String(l.status_id) === '142')
+        .reduce((sum, l) => sum + (l.price || 0), 0);
+
+      const cpl = leadsCount > 0 ? spend / leadsCount : 0;
+      const roas = spend > 0 ? vgvSum / spend : 0;
+
+      totalSpend += spend;
+      totalImpressions += impressions;
+      totalClicks += clicks;
+      totalLeadsCount += leadsCount;
+      totalConversionsCount += conversionsCount;
+      totalVgvSum += vgvSum;
+
+      // Facebook retorna orçamentos em centavos (ex: 5000 = R$ 50,00)
+      const rawBudget = metaInfo?.daily_budget || metaInfo?.lifetime_budget || 0;
+      const budget = parseFloat(rawBudget) / 100;
+
+      return {
+        id: campaignId,
+        name: campaignName,
+        status: metaInfo?.status || 'UNKNOWN',
+        budget,
+        spend,
+        impressions,
+        clicks,
+        ctr: ctr || (clicks > 0 ? clicks / impressions : 0),
+        cpc: cpc || (clicks > 0 ? spend / clicks : 0),
+        cpm: cpm || (impressions > 0 ? (spend / impressions) * 1000 : 0),
+        reach,
+        frequency,
+        leads: leadsCount,
+        conversions: conversionsCount,
+        vgv: vgvSum,
+        cpl,
+        roas
+      };
+    });
+
+    const summary = {
+      totalSpend,
+      totalImpressions,
+      totalClicks,
+      avgCtr: totalImpressions > 0 ? totalClicks / totalImpressions : 0,
+      avgCpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
+      totalLeads: totalLeadsCount,
+      avgCpl: totalLeadsCount > 0 ? totalSpend / totalLeadsCount : 0,
+      totalVgv: totalVgvSum,
+      avgRoas: totalSpend > 0 ? totalVgvSum / totalSpend : 0
+    };
+
+    // 4. Formatar a série temporal para a evolução diária (gráfico)
+    const dailyEvolution = metaData.dailyData.map(day => {
+      const spend = parseFloat(day.spend || 0);
+      const clicks = parseInt(day.clicks || 0, 10);
+      const impressions = parseInt(day.impressions || 0, 10);
+      
+      const dateStartStr = day.date_start; // Formato YYYY-MM-DD
+      const matchingLeadsForDay = leads.filter(l => {
+        const leadDateStr = new Date(l.created_at * 1000).toISOString().split('T')[0];
+        const utmCampaignField = l.custom_fields_values?.find(cf => cf.field_id === 703812);
+        const utmValue = utmCampaignField?.values?.[0]?.value || '';
+        return leadDateStr === dateStartStr && utmValue !== '';
+      });
+
+      return {
+        date: dateStartStr,
+        formattedDate: new Date(`${dateStartStr}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        spend,
+        clicks,
+        leads: matchingLeadsForDay.length
+      };
+    }).sort((a, b) => a.date.localeCompare(b.date));
+
+    const result = {
+      summary,
+      campaigns,
+      dailyEvolution
+    };
+
+    apiCache.set(cacheKey, result);
+    res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao gerar dados do Meta Ads' });
+    res.status(500).json({ error: 'Erro ao processar dados integrados do Meta Ads' });
   }
 });
 
