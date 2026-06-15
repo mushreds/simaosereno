@@ -35,9 +35,9 @@ const CIRURGIA_STAGES = [
  */
 router.get('/config', (req, res) => {
   res.json({
-    metaVgv: parseFloat(process.env.META_VGV || '2430000'),
-    metaConsulta: parseInt(process.env.META_CONSULTA || '100', 10),
-    metaCirurgia: parseInt(process.env.META_CIRURGIA || '36', 10),
+    metaVgv: parseFloat(process.env.META_VGV || '1200000'),
+    metaConsulta: parseInt(process.env.META_CONSULTA || '50', 10),
+    metaCirurgia: parseInt(process.env.META_CIRURGIA || '16', 10),
     investimento: parseFloat(process.env.INVESTIMENTO || '19469'),
   });
 });

@@ -8,12 +8,30 @@ import LoadingState from '../components/LoadingState';
 import { getOverviewMetrics, getConfig, clearCache } from '../services/api';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 
+const getDefaultDateRange = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const formatDate = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  
+  return {
+    startDate: formatDate(firstDay),
+    endDate: formatDate(lastDay)
+  };
+};
+
 const OverviewSales = () => {
-  // Inicialização de período compatível com o print (Maio e Junho de 2026)
-  const [dateRange, setDateRange] = useState({
-    startDate: '2026-05-01',
-    endDate: '2026-06-30',
-  });
+  // Inicialização de período dinâmica (Mês Atual)
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
+
 
   const [filters, setFilters] = useState({
     pipelineId: '',

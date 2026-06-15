@@ -23,7 +23,7 @@ const FilterPanel = ({ filters, onChange }) => {
         Filtros Avançados
       </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
         {/* Filtro por Funil */}
         <div className="flex flex-col gap-2.5 text-left">
           <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">
@@ -59,45 +59,6 @@ const FilterPanel = ({ filters, onChange }) => {
                 {filters.pipelineId === '11649015' && <div className="w-1.5 h-1.5 rounded-full bg-bg-primary" />}
               </div>
               Comercial 02 (Cirurgia)
-            </button>
-          </div>
-        </div>
-
-        {/* Filtro por Tipo de Consulta */}
-        <div className="flex flex-col gap-2.5 text-left">
-          <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">
-            Tipo de Consulta
-          </span>
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => handleTypeChange('Sereno Vip')}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold text-left transition-all duration-200 cursor-pointer ${
-                filters.consultaType === 'Sereno Vip'
-                  ? 'bg-gold-primary border-gold-primary text-bg-primary font-bold shadow-md gold-glow'
-                  : 'bg-bg-tertiary/40 border-border-card text-text-secondary hover:border-gold-border'
-              }`}
-            >
-              <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${
-                filters.consultaType === 'Sereno Vip' ? 'border-bg-primary bg-bg-primary' : 'border-text-muted'
-              }`}>
-                {filters.consultaType === 'Sereno Vip' && <span className="text-white text-[9px] font-black">✓</span>}
-              </div>
-              Sereno Vip
-            </button>
-            <button
-              onClick={() => handleTypeChange('Sereno Start')}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-xs font-semibold text-left transition-all duration-200 cursor-pointer ${
-                filters.consultaType === 'Sereno Start'
-                  ? 'bg-gold-primary border-gold-primary text-bg-primary font-bold shadow-md gold-glow'
-                  : 'bg-bg-tertiary/40 border-border-card text-text-secondary hover:border-gold-border'
-              }`}
-            >
-              <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${
-                filters.consultaType === 'Sereno Start' ? 'border-bg-primary bg-bg-primary' : 'border-text-muted'
-              }`}>
-                {filters.consultaType === 'Sereno Start' && <span className="text-white text-[9px] font-black">✓</span>}
-              </div>
-              Sereno Start
             </button>
           </div>
         </div>

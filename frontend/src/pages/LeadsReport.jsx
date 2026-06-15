@@ -2,12 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { getOverviewMetrics, getPipelines } from '../services/api';
 import { Calendar, Layers, TrendingUp, TrendingDown, DollarSign, Users, AlertOctagon, HelpCircle } from 'lucide-react';
 
+const getDefaultDateRange = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const formatDate = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  
+  return {
+    startDate: formatDate(firstDay),
+    endDate: formatDate(lastDay)
+  };
+};
+
 const LeadsReport = () => {
-  // Período compatível com o print (Maio e Junho de 2026)
-  const [dateRange, setDateRange] = useState({
-    startDate: '2026-05-01',
-    endDate: '2026-06-30',
-  });
+  // Período dinâmico (Mês Atual)
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
+
+  const [localStartDate, setLocalStartDate] = useState(dateRange.startDate);
+  const [localEndDate, setLocalEndDate] = useState(dateRange.endDate);
+
+  useEffect(() => {
+    setLocalStartDate(dateRange.startDate);
+    setLocalEndDate(dateRange.endDate);
+  }, [dateRange]);
 
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -99,17 +124,30 @@ const LeadsReport = () => {
               { label: 'Mês', val: 30 },
               { label: '3M', val: 90 },
             ].map((item) => {
-              const today = new Date('2026-06-12');
-              let start = new Date('2026-06-12');
+              const today = new Date();
+              let start = new Date(today);
               if (item.val > 0) {
                 start.setDate(today.getDate() - (item.val === 1 ? 1 : item.val - 1));
               }
-              const startStr = start.toISOString().split('T')[0];
-              const endStr = today.toISOString().split('T')[0];
+              
+              const formatDateStr = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+              };
+              
+              const startStr = formatDateStr(start);
+              const endStr = formatDateStr(today);
               const isActive = dateRange.startDate === startStr && dateRange.endDate === endStr;
 
               const handleQuickFilter = () => {
-                setDateRange({ startDate: startStr, endDate: endStr });
+                if (isActive) {
+                  // Se já estiver ativo, volta para o padrão do mês atual
+                  setDateRange(getDefaultDateRange());
+                } else {
+                  setDateRange({ startDate: startStr, endDate: endStr });
+                }
               };
 
               return (
@@ -118,7 +156,7 @@ const LeadsReport = () => {
                   onClick={handleQuickFilter}
                   className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#2A2115]/50 border border-gold-primary text-[#FFF3E3] shadow-md'
+                      ? 'bg-[#2A2115]/50 border border-gold-primary text-[#FFF3E3] shadow-md gold-glow'
                       : 'bg-transparent border border-transparent text-text-secondary hover:text-white'
                   }`}
                 >
@@ -128,22 +166,32 @@ const LeadsReport = () => {
             })}
           </div>
 
-          {/* Date Picker */}
-          <div className="flex items-center gap-2 bg-bg-secondary border border-border-card rounded-xl px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-md hover:border-gold-border transition-colors duration-200">
-            <Calendar className="w-4 h-4 text-gold-primary" />
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              className="bg-transparent text-white border-none outline-none focus:ring-0 cursor-pointer [color-scheme:dark]"
-            />
-            <span className="text-text-muted">até</span>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              className="bg-transparent text-white border-none outline-none focus:ring-0 cursor-pointer [color-scheme:dark]"
-            />
+          {/* Date Picker com Botão Aplicar */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-bg-secondary border border-border-card rounded-xl px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-md hover:border-gold-border transition-colors duration-200">
+              <Calendar className="w-4 h-4 text-gold-primary" />
+              <input
+                type="date"
+                value={localStartDate}
+                onChange={(e) => setLocalStartDate(e.target.value)}
+                className="bg-transparent text-white border-none outline-none focus:ring-0 cursor-pointer [color-scheme:dark]"
+              />
+              <span className="text-text-muted">até</span>
+              <input
+                type="date"
+                value={localEndDate}
+                onChange={(e) => setLocalEndDate(e.target.value)}
+                className="bg-transparent text-white border-none outline-none focus:ring-0 cursor-pointer [color-scheme:dark]"
+              />
+            </div>
+            {(localStartDate !== dateRange.startDate || localEndDate !== dateRange.endDate) && (
+              <button
+                onClick={() => setDateRange({ startDate: localStartDate, endDate: localEndDate })}
+                className="px-3 py-2 bg-gold-primary hover:bg-gold-hover text-bg-primary font-bold rounded-xl text-[10px] uppercase tracking-wider shadow-md transition-all cursor-pointer gold-glow animate-pulse"
+              >
+                Aplicar
+              </button>
+            )}
           </div>
         </div>
       </div>
