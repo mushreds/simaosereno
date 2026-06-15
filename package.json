@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm install --prefix frontend && npm run build --prefix frontend && cp -R frontend/dist ./dist && rm -rf api/src && cp -r backend/src api/src"
+    "build": "npm install --prefix frontend && npm run build --prefix frontend && cp -R frontend/dist ./dist"
 
   },
   "dependencies": {

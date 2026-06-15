@@ -1,5 +1,3 @@
-// Vercel Serverless Function entry point
-// The build.sh script copies backend/src into api/src/ before deployment
-import app from './src/server.js';
+import app from './server.js';
 
 export default app;
