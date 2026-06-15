@@ -8,9 +8,16 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Configuração de CORS para permitir acesso do frontend
+// Configuração de CORS
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Permite: sem origin (mobile/curl), localhost, e qualquer subdomínio vercel.app
+    if (!origin || origin.includes('localhost') || origin.includes('vercel.app') || origin === process.env.FRONTEND_URL) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   optionsSuccessStatus: 200
 };
 
@@ -24,7 +31,13 @@ app.use((req, res, next) => {
 });
 
 // Rotas da API
-app.use('/api', apiRouter);
+// Na Vercel, api/index.js já é servido em /api/*, então as rotas ficam na raiz
+// Localmente, montamos em /api para corresponder ao proxy do Vite
+if (process.env.VERCEL) {
+  app.use('/', apiRouter);
+} else {
+  app.use('/api', apiRouter);
+}
 
 // Rota de status do servidor
 app.get('/health', (req, res) => {
