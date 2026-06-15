@@ -10,7 +10,8 @@ import {
   Eye, 
   Activity, 
   CheckCircle, 
-  PauseCircle 
+  PauseCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 const MetaAdsReport = () => {
@@ -23,6 +24,7 @@ const MetaAdsReport = () => {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
 
   const loadAdsData = async (showIndicator = false) => {
     if (showIndicator) setRefreshing(true);
@@ -32,8 +34,14 @@ const MetaAdsReport = () => {
         endDate: dateRange.endDate,
       });
       setMetrics(data);
+      if (data?.error) {
+        setShowErrorPopup(true);
+      } else {
+        setShowErrorPopup(false);
+      }
     } catch (err) {
       console.error('Error loading Meta Ads metrics:', err);
+      setShowErrorPopup(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -46,27 +54,27 @@ const MetaAdsReport = () => {
 
   // Formatação de Moeda BRL
   const formatCurrency = (val) => {
-    return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `R$ ${(val || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   // Formatação de Moeda BRL Sem Centavos (para visual compactado)
   const formatCurrencyCompact = (val) => {
-    return `R$ ${Math.round(val).toLocaleString('pt-BR')}`;
+    return `R$ ${Math.round(val || 0).toLocaleString('pt-BR')}`;
   };
 
   // Formatação de Números
   const formatNumber = (val) => {
-    return Math.round(val).toLocaleString('pt-BR');
+    return Math.round(val || 0).toLocaleString('pt-BR');
   };
 
   // Formatação de Porcentagem
   const formatPercent = (val) => {
-    return `${(val * 100).toFixed(2).replace('.', ',')}%`;
+    return `${((val || 0) * 100).toFixed(2).replace('.', ',')}%`;
   };
 
   // Formatação de ROAS (ex: 48,86x)
   const formatRoas = (val) => {
-    return `${val.toFixed(2).replace('.', ',')}x`;
+    return `${(val || 0).toFixed(2).replace('.', ',')}x`;
   };
 
   if (loading) {
@@ -132,6 +140,31 @@ const MetaAdsReport = () => {
   return (
     <div className="w-full flex flex-col gap-6 select-none p-6 bg-[#0B0B0C] min-h-screen text-text-primary">
       
+      {/* Popup de Erro da API da Meta */}
+      {showErrorPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#14171B] border border-red-950 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl text-center flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-200">
+            <div className="w-12 h-12 rounded-full bg-red-950/45 border border-red-900/40 flex items-center justify-center text-red-500">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-2">
+                Erro na API da Meta
+              </h3>
+              <p className="text-[11px] text-text-secondary leading-relaxed">
+                Erro de comunicação com a API da Meta. Por favor, acione o suporte.
+              </p>
+            </div>
+            <button 
+              onClick={() => setShowErrorPopup(false)}
+              className="mt-2 w-full py-2 bg-red-950/20 hover:bg-red-950/55 border border-red-900/30 rounded-xl text-[10px] font-black text-red-400 uppercase tracking-widest transition-all cursor-pointer"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header da Página */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-4 border-b border-border-card">
         <div className="flex flex-col text-left">
@@ -306,7 +339,7 @@ const MetaAdsReport = () => {
           <div>
             <span className="text-[8px] font-black text-gold-primary tracking-widest uppercase block">ROAS Geral CRM</span>
             <span className="text-lg font-black text-gold-hover mt-1 block mono-numbers">
-              {formatRoas(summary.overallRoas)}
+              {formatRoas(summary.overallRoas || summary.avgRoas || 0)}
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-2">

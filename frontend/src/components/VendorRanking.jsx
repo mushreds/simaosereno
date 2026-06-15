@@ -28,7 +28,7 @@ const VendorRanking = ({ vendors }) => {
               <th className="py-2.5">Vendedor</th>
               <th className="py-2.5 text-right"><span className="hidden sm:inline">Ranking (VGV)</span><span className="inline sm:hidden">VGV</span></th>
               <th className="py-2.5 text-right">Vendas</th>
-              <th className="py-2.5 text-right">% VGV</th>
+              <th className="py-2.5 text-right">% Meta Mês</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#222326] text-xs font-medium text-text-secondary">

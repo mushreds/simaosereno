@@ -370,11 +370,12 @@ router.get('/metrics/overview', async (req, res, next) => {
       }
     });
 
+    const metaVgv = parseFloat(process.env.META_VGV || '1200000');
     const rankingVendedores = Object.values(salesByVendor)
       .map(vendor => {
         return {
           ...vendor,
-          pctVgv: vgvTotal > 0 ? (vendor.vgv / vgvTotal) * 100 : 0
+          pctVgv: metaVgv > 0 ? (vendor.vgv / metaVgv) * 100 : 0
         };
       })
       .sort((a, b) => b.vgv - a.vgv);
@@ -993,12 +994,25 @@ router.get('/metrics/meta-ads', async (req, res, next) => {
     console.log(`Fetching real Meta Ads data from ${start} to ${end}...`);
     const metaData = await metaAdsService.getCampaignsInsights(start, end);
 
-    // Se a API da Meta não retornou dados (ex: sem token, conta vazia ou erro), usamos o Mock como fallback
+    // Se a API da Meta não retornou dados (ex: sem token, conta vazia ou erro), retornamos o estado zerado com erro para o painel
     if (!metaData || !metaData.insightsData || metaData.insightsData.length === 0) {
-      console.warn('No real Meta Ads campaigns retrieved. Falling back to dynamic Mock Data...');
-      const fallbackData = getMetaAdsMockData(start, end);
-      apiCache.set(cacheKey, fallbackData);
-      return res.json(fallbackData);
+      console.warn('No real Meta Ads campaigns retrieved or Meta API error. Returning zeroed state...');
+      return res.json({
+        error: true,
+        summary: {
+          totalSpend: 0,
+          totalImpressions: 0,
+          totalClicks: 0,
+          avgCtr: 0,
+          avgCpc: 0,
+          totalLeads: 0,
+          avgCpl: 0,
+          totalVgv: 0,
+          avgRoas: 0
+        },
+        campaigns: [],
+        dailyEvolution: []
+      });
     }
 
     // 2. Buscar leads do Kommo no mesmo período para cruzar as conversões
@@ -1130,7 +1144,23 @@ router.get('/metrics/meta-ads', async (req, res, next) => {
     apiCache.set(cacheKey, result);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao processar dados integrados do Meta Ads' });
+    console.error('Error in /metrics/meta-ads:', error);
+    res.json({
+      error: true,
+      summary: {
+        totalSpend: 0,
+        totalImpressions: 0,
+        totalClicks: 0,
+        avgCtr: 0,
+        avgCpc: 0,
+        totalLeads: 0,
+        avgCpl: 0,
+        totalVgv: 0,
+        avgRoas: 0
+      },
+      campaigns: [],
+      dailyEvolution: []
+    });
   }
 });
 
