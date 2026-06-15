@@ -76,7 +76,7 @@ const SimaoReport = () => {
         <div className="flex flex-col text-left">
           <h2 className="text-xl font-bold tracking-widest text-text-secondary uppercase flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-gold-primary" />
-            Simão Sereno System
+            Total de Leads Diário
           </h2>
           <span className="text-[10px] text-text-muted font-medium tracking-wider mt-0.5">
             Monitor diário de entrada de leads e acompanhamento de coortes de tráfego

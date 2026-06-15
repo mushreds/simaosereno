@@ -34,7 +34,7 @@ function App() {
                 : 'bg-transparent border border-transparent text-text-secondary hover:text-white'
             }`}
           >
-            Funil<span className="hidden sm:inline"> de Leads</span>
+            Leads
           </button>
           <button 
             onClick={() => setActivePage('simao')}
@@ -44,7 +44,7 @@ function App() {
                 : 'bg-transparent border border-transparent text-text-secondary hover:text-white'
             }`}
           >
-            Acompanhamento Diário
+            Diário
           </button>
           <button 
             onClick={() => setActivePage('meta')}

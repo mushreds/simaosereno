@@ -1,15 +1,8 @@
 import React from 'react';
 
-const FunnelChart = ({ title, stages, conversionRate }) => {
+const FunnelChart = ({ title, stages, conversionRate, totalLeads }) => {
   // Encontra o valor máximo para dimensionar as barras horizontalmente
   const maxCount = stages && stages.length > 0 ? Math.max(...stages.map(s => s.count)) : 1;
-
-  const formatCurrency = (val) => {
-    if (val >= 1000) {
-      return `R$ ${(val / 1000).toFixed(2).replace('.', ',')} Mil`;
-    }
-    return `R$ ${val.toFixed(2).replace('.', ',')}`;
-  };
 
   return (
     <div className="flex bg-[#141517] border border-border-card rounded-2xl p-4 md:p-5 shadow-lg relative h-full flex-col md:flex-row gap-4">
@@ -18,10 +11,10 @@ const FunnelChart = ({ title, stages, conversionRate }) => {
         <span className="text-xs font-black tracking-widest text-white uppercase">{title}</span>
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] font-extrabold text-gold-primary leading-none mono-numbers">
-            {conversionRate.toFixed(2).replace('.', ',')}%
+            {totalLeads || 0}
           </span>
           <span className="text-[8px] text-text-muted font-bold tracking-widest uppercase leading-none">
-            Vendas
+            Leads
           </span>
         </div>
       </div>
@@ -33,10 +26,10 @@ const FunnelChart = ({ title, stages, conversionRate }) => {
         </span>
         <div className="flex flex-col items-center gap-1 mt-2">
           <span className="text-[9px] font-bold text-gold-primary tracking-wider leading-none mono-numbers">
-            {conversionRate.toFixed(2).replace('.', ',')}%
+            {totalLeads || 0}
           </span>
           <span className="text-[7px] text-text-muted font-bold tracking-widest uppercase leading-none">
-            Vendas
+            Leads
           </span>
         </div>
       </div>
@@ -47,8 +40,8 @@ const FunnelChart = ({ title, stages, conversionRate }) => {
         <div className="flex justify-between items-center text-[8px] font-bold text-text-muted tracking-widest uppercase px-1 md:px-2">
           <span className="w-16 sm:w-24 text-left">Etapas</span>
           <span className="flex-1 text-center pr-4 sm:pr-16">Leads</span>
-          <span className="w-14 sm:w-20 text-right">Tx. Conv.</span>
-          <span className="w-14 sm:w-16 text-right">Custo</span>
+          <span className="w-16 sm:w-20 text-right">% Leads</span>
+          <span className="w-16 sm:w-20 text-right">% Conversão</span>
         </div>
 
         {/* Linhas das Etapas */}
@@ -56,6 +49,15 @@ const FunnelChart = ({ title, stages, conversionRate }) => {
           {stages && stages.map((stage, idx) => {
             // Calcula a largura proporcional da barra (mínimo de 30% para legibilidade)
             const widthPercent = maxCount > 0 ? (stage.count / maxCount) * 70 + 30 : 30;
+
+            // Calcula o percentual de conversão em relação à etapa anterior
+            let relativeConvRate = 100;
+            if (idx > 0 && stages[idx - 1].count > 0) {
+              relativeConvRate = (stage.count / stages[idx - 1].count) * 100;
+            } else if (idx > 0) {
+              relativeConvRate = 0;
+            }
+            const convRateStr = `${relativeConvRate.toFixed(1).replace('.', ',')}%`;
 
             return (
               <div key={stage.name} className="flex justify-between items-center text-xs h-8 group gap-1">
@@ -83,13 +85,13 @@ const FunnelChart = ({ title, stages, conversionRate }) => {
                 </div>
 
                 {/* Taxa de Conversão */}
-                <span className="w-14 sm:w-20 text-right text-[8px] sm:text-[10px] font-semibold text-text-secondary select-none mono-numbers">
+                <span className="w-16 sm:w-20 text-right text-[8px] sm:text-[10px] font-semibold text-text-secondary select-none mono-numbers">
                   {stage.txConversao.toFixed(1).replace('.', ',')}%
                 </span>
 
                 {/* Custo por Lead da Etapa */}
-                <span className="w-14 sm:w-16 text-right text-[8px] sm:text-[10px] font-bold text-gold-primary select-none mono-numbers">
-                  {formatCurrency(stage.custo)}
+                <span className="w-16 sm:w-20 text-right text-[8px] sm:text-[10px] font-bold text-gold-primary select-none mono-numbers">
+                  {convRateStr}
                 </span>
               </div>
             );

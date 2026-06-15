@@ -160,42 +160,44 @@ const OverviewSales = () => {
 
       {/* Grid de KPIs Superiores (6 Cards) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <KPICard title="VGV" value={metrics.vgvTotal} formatType="money" />
-        <KPICard title="Consulta" value={metrics.taxaConversaoConsulta} formatType="percent" />
-        <KPICard title="Cirurgia" value={metrics.taxaConversaoCirurgia} formatType="percent" />
+        <KPICard title="Realizado VGV" value={metrics.vgvTotal} formatType="money" />
+        <KPICard title="Realizado Consulta" value={metrics.taxaConversaoConsulta} formatType="percent" />
+        <KPICard title="Realizado Cirurgia" value={metrics.taxaConversaoCirurgia} formatType="percent" />
         <KPICard title="Ticket Médio Consulta" value={metrics.ticketMedioConsulta} formatType="money" />
         <KPICard title="Ticket Médio Cirurgia" value={metrics.ticketMedioCirurgia} formatType="money" />
         <KPICard title="Investimento" value={metrics.investimento} formatType="money" />
       </div>
 
-      {/* Grid Principal (Funnels na esquerda / Ranking e Filtros na direita) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 items-stretch">
+      {/* Grid Principal Reorganizado (Simetria 2x2: Funis lado a lado, Origem e Ranking abaixo) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         
-        {/* Coluna da Esquerda: Funis */}
-        <div className="flex flex-col gap-6 h-full justify-between">
-          <div className="flex-1 min-h-[300px]">
+        {/* Coluna da Esquerda: Consulta e Filtro de Origem */}
+        <div className="flex flex-col gap-6">
+          <div className="flex-1 min-h-[320px]">
             <FunnelChart
               title="Consulta"
               stages={metrics.consultaFunnel}
               conversionRate={metrics.taxaConversaoConsulta}
+              totalLeads={metrics.totalConsultaLeadsCount}
             />
           </div>
-          <div className="flex-1 min-h-[220px]">
+          <div className="min-h-[110px]">
+            <FilterPanel filters={filters} onChange={setFilters} />
+          </div>
+        </div>
+
+        {/* Coluna da Direita: Cirurgia e Ranking de Vendedores */}
+        <div className="flex flex-col gap-6">
+          <div className="flex-1 min-h-[320px]">
             <FunnelChart
               title="Cirurgia"
               stages={metrics.cirurgiaFunnel}
               conversionRate={metrics.taxaConversaoCirurgia}
+              totalLeads={metrics.totalCirurgiaLeadsCount}
             />
           </div>
-        </div>
-
-        {/* Coluna da Direita: Ranking e Filtros */}
-        <div className="flex flex-col gap-6 h-full justify-between">
-          <div className="flex-1 min-h-[260px]">
+          <div className="flex-1 min-h-[220px]">
             <VendorRanking vendors={metrics.rankingVendedores} />
-          </div>
-          <div className="flex-1 min-h-[200px]">
-            <FilterPanel filters={filters} onChange={setFilters} />
           </div>
         </div>
 

@@ -13,6 +13,18 @@ const apiCache = new NodeCache({ stdTTL: cacheTTL, checkperiod: cacheTTL * 0.2 }
 const PIPELINE_CONSULTA_ID = 11626995; // Comercial 01
 const PIPELINE_CIRURGIA_ID = 11649015; // Comercial 02
 
+// Filtro consolidado de pipelines e status IDs para corresponder ao relatório consolidado do CRM
+const CONSOLIDATED_PIPELINES_FILTER = {
+  "11626995": ["101033719", "101084843", "101537307", "104676051", "92628163", "92648831", "93645571", "93645575", "95292807", "95292811", "96003771"],
+  "11649015": ["101534923", "101534991", "92628651", "92628655", "92628659", "92647035", "92648875"],
+  "11649019": ["101036711", "102712215", "142", "143", "92627555"],
+  "12010351": ["92644687"],
+  "12121895": ["93589023", "93589027", "93589031"],
+  "13103191": ["101033907", "101033911", "101033915", "101037979"],
+  "13135035": ["101286059", "101286063", "101288607", "104668351", "104668395", "104668399"],
+  "13327895": ["102785703", "102785707", "102785711", "104648747", "104648751", "104648755", "104648759", "104648763", "104648767"]
+};
+
 // Mapeamento das etapas do funil de Consulta (Comercial 01)
 const CONSULTA_STAGES = [
   { name: 'TOTAL LEADS', ids: null }, // Todos os leads do pipeline
@@ -25,7 +37,7 @@ const CONSULTA_STAGES = [
 
 // Mapeamento das etapas do funil de Cirurgia (Comercial 02)
 const CIRURGIA_STAGES = [
-  { name: 'PASSOU EM CONSULTA', ids: ['92628651', '92628655', '92628659', '101534923', '101534991', '142'] },
+  { name: 'PASSOU EM CONSULTA', ids: null },
   { name: 'EM NEGOCIAÇÃO', ids: ['92628659', '101534923', '142'] },
   { name: 'AGUARDANDO PAGAMENTO', ids: ['101534923', '142'] },
   { name: 'VENDAS', ids: ['142'] }
@@ -198,153 +210,124 @@ router.get('/metrics/overview', async (req, res, next) => {
       }
     }
 
-    // 5. PROCESSAR MÉTRICAS DO PIPELINE 01: CONSULTA (Comercial 01)
+    // 5. PROCESSAR METODOLOGIA DE CONSOLIDADO DE ETAPAS DINÂMICAS
+    const cacheKeyPipelines = 'kommo_pipelines';
+    let pipelines = apiCache.get(cacheKeyPipelines);
+    if (!pipelines) {
+      try {
+        pipelines = await kommoService.getPipelines();
+        apiCache.set(cacheKeyPipelines, pipelines);
+      } catch (err) {
+        console.error('Error fetching pipelines metadata:', err.message);
+        pipelines = [];
+      }
+    }
+
+    const stagesMap = {
+      '142': 'VENDA GANHA',
+      '143': 'Venda Perdida',
+      '11626995_142': 'VENDA GANHA',
+      '11626995_143': 'Venda Perdida',
+      '11649015_142': 'VENDA GANHA',
+      '11649015_143': 'Venda Perdida'
+    };
+
+    if (pipelines && pipelines.length > 0) {
+      pipelines.forEach(pipe => {
+        const statuses = pipe._embedded?.statuses || [];
+        statuses.forEach(stg => {
+          stagesMap[String(stg.id)] = stg.name;
+        });
+      });
+    }
+
+    // Filtrar leads por pipeline
     const consultaLeads = filteredLeads.filter(l => l.pipeline_id === PIPELINE_CONSULTA_ID);
     const totalConsultaLeadsCount = consultaLeads.length;
 
-    const consultaFunnel = CONSULTA_STAGES.map(stage => {
-      let count = 0;
-      if (stage.ids === null) {
-        count = totalConsultaLeadsCount;
-      } else {
-        count = consultaLeads.filter(l => stage.ids.includes(String(l.status_id))).length;
-      }
-      return {
-        name: stage.name,
-        count
-      };
-    });
+    const cirurgiaLeads = filteredLeads.filter(l => l.pipeline_id === PIPELINE_CIRURGIA_ID);
+    const totalCirurgiaLeadsCount = cirurgiaLeads.length;
+    const passouConsultaCount = totalCirurgiaLeadsCount;
 
-    // Vendas Consulta = Vendas no pipeline Comercial 01 (status_id = 142)
-    const vendasConsultaCount = consultaFunnel.find(s => s.name === 'VENDAS')?.count || 0;
+    // Calcular Vendas e VGV de forma direta
+    const vendasConsultaCount = consultaLeads.filter(l => String(l.status_id) === '142').length;
     const vgvConsulta = consultaLeads
       .filter(l => String(l.status_id) === '142')
       .reduce((sum, l) => sum + (l.price || 0), 0);
 
-    // 6. PROCESSAR MÉTRICAS DO PIPELINE 02: CIRURGIA (Comercial 02)
-    const cirurgiaLeads = filteredLeads.filter(l => l.pipeline_id === PIPELINE_CIRURGIA_ID);
-    
-    const cirurgiaFunnel = CIRURGIA_STAGES.map(stage => {
-      const count = cirurgiaLeads.filter(l => stage.ids.includes(String(l.status_id))).length;
-      return {
-        name: stage.name,
-        count
-      };
-    });
-
-    // Vendas Cirurgia = Vendas no pipeline Comercial 02 (status_id = 142)
-    const vendasCirurgiaCount = cirurgiaFunnel.find(s => s.name === 'VENDAS')?.count || 0;
+    const vendasCirurgiaCount = cirurgiaLeads.filter(l => String(l.status_id) === '142').length;
     const vgvCirurgia = cirurgiaLeads
       .filter(l => String(l.status_id) === '142')
       .reduce((sum, l) => sum + (l.price || 0), 0);
 
-    // 7. MÉTRICAS GERAIS
-    const vgvTotal = vgvConsulta + vgvCirurgia;
-    const totalVendasCount = vendasConsultaCount + vendasCirurgiaCount;
-
-    // Taxa de conversão geral
-    // Consulta %: (Vendas Consulta / Total Leads Consulta)
+    // Calcular taxas de conversão de vendas (Vendas / Total Leads)
     const taxaConversaoConsulta = totalConsultaLeadsCount > 0 
       ? (vendasConsultaCount / totalConsultaLeadsCount) * 100 
       : 0;
 
-    // Cirurgia %: (Vendas Cirurgia / Total Leads Cirurgia ou total que passou em Consulta?)
-    // No print, a taxa de cirurgia é 44.12%.
-    // Vendas Cirurgia = 15. Passou em Consulta = 34. 15 / 34 = 44.117% (44,12%)!
-    // Exato! A taxa de cirurgia é (Vendas Cirurgia / Passou em Consulta) * 100!
-    const passouConsultaCount = cirurgiaFunnel.find(s => s.name === 'PASSOU EM CONSULTA')?.count || 0;
-    const taxaConversaoCirurgia = passouConsultaCount > 0 
-      ? (vendasCirurgiaCount / passouConsultaCount) * 100 
+    const taxaConversaoCirurgia = totalCirurgiaLeadsCount > 0 
+      ? (vendasCirurgiaCount / totalCirurgiaLeadsCount) * 100 
       : 0;
 
-    // Ticket Médio
+    const vgvTotal = vgvConsulta + vgvCirurgia;
+    const totalVendasCount = vendasConsultaCount + vendasCirurgiaCount;
+
     const ticketMedioConsulta = vendasConsultaCount > 0 ? vgvConsulta / vendasConsultaCount : 0;
     const ticketMedioCirurgia = vendasCirurgiaCount > 0 ? vgvCirurgia / vendasCirurgiaCount : 0;
 
-    // Investimento & ROAS
-    const investimento = parseFloat(process.env.INVESTIMENTO || '19469');
+    // Buscar investimento dinâmico da API da Meta para o período
+    let investimento = 0;
+    try {
+      // Usar datas no formato YYYY-MM-DD
+      const start = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+      const end = endDate || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0];
+      const metaData = await metaAdsService.getCampaignsInsights(start, end);
+      if (metaData && metaData.insightsData) {
+        investimento = metaData.insightsData.reduce((sum, insight) => sum + parseFloat(insight.spend || 0), 0);
+      }
+    } catch (err) {
+      console.error('Error fetching dynamic Meta Ads investment:', err.message);
+      investimento = parseFloat(process.env.INVESTIMENTO || '0');
+    }
     const roas = investimento > 0 ? vgvTotal / investimento : 0;
 
-    // Calcular taxa de conversão e custo por etapa para o funil Consulta
-    // No print de referência:
-    // Custo etapa = Investimento / Leads na etapa.
-    // Exemplo:
-    // TOTAL LEADS (624) -> Custo: 19469 / 624 = R$ 31,20
-    // INTERAÇÕES (417) -> Custo: 19469 / 417 = R$ 46,69
-    // APN / OFERTA FEITA (220) -> Custo: 19469 / 220 = R$ 88,49
-    // EM NEGOCIAÇÃO (58) -> Custo: 19469 / 58 = R$ 335,67 (335,66 no print)
-    // AG. PAGAMENTO (46) -> Custo: 19469 / 46 = R$ 423,23
-    // VENDAS (46) -> Custo: 19469 / 46 = R$ 423,23
-    // E a taxa de conversão de cada etapa é em relação à etapa anterior!
-    // Exemplo:
-    // INTERAÇÕES (417) / TOTAL LEADS (624) = 66,826% (66,83% no print)
-    // APN (220) / INTERAÇÕES (417) = 52,757% (52,76% no print)
-    // NEGOCIACAO (58) / APN (220) = 26,36%
-    // AG. PAGAMENTO (46) / NEGOCIACAO (58) = 79,31%
-    // VENDAS (46) / AG. PAGAMENTO (46) = 100%
-    // Conversão Geral = Vendas (46) / Total Leads (624) = 7,37% (está no print no card da etapa Vendas!)
-    const consultaFunnelCalculated = consultaFunnel.map((stage, idx) => {
-      let txConversao = 0;
-      if (idx === 0) {
-        // TOTAL LEADS -> conversão da primeira etapa é 100% ou em relação ao total?
-        // No print diz "TOTAL LEADS: 624 | Tx. Conversão: 66,83%".
-        // Espera! A taxa de conversão ao lado de TOTAL LEADS é 66,83%?
-        // Ah! No print:
-        // TOTAL LEADS: 624 | Tx. Conversão: 66,83% (que é a conversão de total para interações!)
-        // INTERAÇÕES: 417 | Tx. Conversão: 52,76% (conversão de interações para APN!)
-        // APN / OFERTA FEITA: 220 | Tx. Conversão: 26,36%
-        // E assim por diante.
-        // Ou seja, a taxa exibida ao lado da etapa N é a conversão para a etapa N+1.
-        // Vamos calcular a taxa da etapa N em relação à etapa N-1 para cada etapa, exceto a primeira, que pode ser a conversão para a segunda.
-        // Vamos manter a lógica exata de conversão entre etapas:
-        // Etapa N -> (Etapa N / Etapa N-1)
-        const nextStage = consultaFunnel[idx + 1];
-        if (nextStage) {
-          txConversao = stage.count > 0 ? (nextStage.count / stage.count) * 100 : 0;
-        } else {
-          // Última etapa (Vendas)
-          txConversao = totalConsultaLeadsCount > 0 ? (stage.count / totalConsultaLeadsCount) * 100 : 0;
-        }
+    // Calcular etapas do Funil de Consulta (Comercial 01)
+    const consultaFunnelCalculated = CONSULTA_STAGES.map(stage => {
+      let count = 0;
+      let value = 0;
+      if (stage.ids === null) {
+        count = consultaLeads.length;
+        value = consultaLeads.reduce((sum, l) => sum + (l.price || 0), 0);
       } else {
-        const prevStage = consultaFunnel[idx - 1];
-        txConversao = prevStage.count > 0 ? (stage.count / prevStage.count) * 100 : 0;
+        const matchingLeads = consultaLeads.filter(l => stage.ids.includes(String(l.status_id)));
+        count = matchingLeads.length;
+        value = matchingLeads.reduce((sum, l) => sum + (l.price || 0), 0);
       }
-
-      const custo = stage.count > 0 ? investimento / stage.count : 0;
-
       return {
-        ...stage,
-        txConversao,
-        custo
+        name: stage.name,
+        count,
+        txConversao: totalConsultaLeadsCount > 0 ? (count / totalConsultaLeadsCount) * 100 : 0,
+        custo: value
       };
     });
 
-    // E a taxa de conversão de cada etapa para o funil Cirurgia:
-    // PASSOU EM CONSULTA (34)
-    // EM NEGOCIAÇÃO (17) -> Conversão: 17 / 34 = 50%
-    // AG. PAGAMENTO (16) -> Conversão: 16 / 17 = 94,12%
-    // VENDAS (15) -> Conversão: 15 / 16 = 93,75%
-    // E no print:
-    // PASSOU EM CONSULTA (34) | Tx. Conversão: 50%
-    // EM NEGOCIAÇÃO (17) | Tx. Conversão: 94,12%
-    // AG. PAGAMENTO (16) | Tx. Conversão: 93,75%
-    // VENDAS (15) | Tx. Conversão: 44,12% (15 / 34 = conversão geral!)
-    const cirurgiaFunnelCalculated = cirurgiaFunnel.map((stage, idx) => {
-      let txConversao = 0;
-      const prevStage = cirurgiaFunnel[idx - 1];
-      if (idx === 0) {
-        const nextStage = cirurgiaFunnel[idx + 1];
-        txConversao = stage.count > 0 ? (nextStage.count / stage.count) * 100 : 0;
+    // Calcular etapas do Funil de Cirurgia (Comercial 02)
+    const cirurgiaFunnelCalculated = CIRURGIA_STAGES.map(stage => {
+      let count = 0;
+      let value = 0;
+      if (stage.ids === null) {
+        count = cirurgiaLeads.length;
+        value = cirurgiaLeads.reduce((sum, l) => sum + (l.price || 0), 0);
       } else {
-        txConversao = prevStage.count > 0 ? (stage.count / prevStage.count) * 100 : 0;
+        const matchingLeads = cirurgiaLeads.filter(l => stage.ids.includes(String(l.status_id)));
+        count = matchingLeads.length;
+        value = matchingLeads.reduce((sum, l) => sum + (l.price || 0), 0);
       }
-
-      const custo = stage.count > 0 ? investimento / stage.count : 0;
-
       return {
-        ...stage,
-        txConversao,
-        custo
+        name: stage.name,
+        count,
+        txConversao: totalCirurgiaLeadsCount > 0 ? (count / totalCirurgiaLeadsCount) * 100 : 0,
+        custo: value
       };
     });
 
@@ -380,6 +363,17 @@ router.get('/metrics/overview', async (req, res, next) => {
       })
       .sort((a, b) => b.vgv - a.vgv);
 
+    // Filtrar leads para o consolidado baseado nas pipelines e status permitidos
+    const consolidatedLeads = filteredLeads.filter(lead => {
+      const pipeIdStr = String(lead.pipeline_id);
+      const statusIdStr = String(lead.status_id);
+      if (!CONSOLIDATED_PIPELINES_FILTER[pipeIdStr]) {
+        return false;
+      }
+      return CONSOLIDATED_PIPELINES_FILTER[pipeIdStr].includes(statusIdStr);
+    });
+    const totalLeadsCount = consolidatedLeads.length;
+
     // Resposta final consolidada
     const metrics = {
       // Kpis Gerais
@@ -403,7 +397,9 @@ router.get('/metrics/overview', async (req, res, next) => {
       vendasConsultaCount,
       vendasCirurgiaCount,
       passouConsultaCount,
-      totalConsultaLeadsCount
+      totalConsultaLeadsCount,
+      totalCirurgiaLeadsCount,
+      totalLeadsCount
     };
 
     // Salvar no cache antes de responder
@@ -1079,6 +1075,10 @@ router.get('/metrics/meta-ads', async (req, res, next) => {
       const rawBudget = metaInfo?.daily_budget || metaInfo?.lifetime_budget || 0;
       const budget = parseFloat(rawBudget) / 100;
 
+      const thruplays = insight.video_thruplay_watched_actions?.[0]?.value
+        ? parseInt(insight.video_thruplay_watched_actions[0].value, 10)
+        : 0;
+
       return {
         id: campaignId,
         name: campaignName,
@@ -1096,7 +1096,8 @@ router.get('/metrics/meta-ads', async (req, res, next) => {
         conversions: conversionsCount,
         vgv: vgvSum,
         cpl,
-        roas
+        roas,
+        thruplays
       };
     });
 

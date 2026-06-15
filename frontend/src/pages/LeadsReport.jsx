@@ -82,13 +82,13 @@ const LeadsReport = () => {
   }
 
   // Estatísticas calculadas de forma segura para o CEO
-  const totalLeadsEntrada = metrics ? metrics.totalConsultaLeadsCount : 0;
+  const totalLeadsEntrada = metrics ? metrics.totalLeadsCount : 0;
   const totalLeadsGanhos = metrics ? metrics.vendasConsultaCount + metrics.vendasCirurgiaCount : 0;
   const investimentoTotal = metrics ? metrics.investimento : 0;
   const cplGeral = totalLeadsEntrada > 0 ? investimentoTotal / totalLeadsEntrada : 0;
 
   // Motivos de desqualificação simulados com dados estatísticos reais de funil baseados na taxa de perda
-  const totalPerdidos = metrics ? (totalLeadsEntrada - metrics.vendasConsultaCount) : 0;
+  const totalPerdidos = metrics ? (totalLeadsEntrada - totalLeadsGanhos) : 0;
   
   const lossReasonsStats = [
     { reason: 'Sem interesse no momento / FUP futuro', count: Math.round(totalPerdidos * 0.42) || 0 },
@@ -105,7 +105,7 @@ const LeadsReport = () => {
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-4 border-b border-border-card">
         <div className="flex flex-col text-left">
           <h2 className="text-xl font-bold tracking-widest text-text-secondary uppercase">
-            Visão Geral de Conversão do Funil (CEO Report)
+            Total de Leads Mensal
           </h2>
           <span className="text-[10px] text-text-muted font-medium tracking-wider mt-0.5">
             Métricas de volume, gargalos de etapas e desempenho do comercial
@@ -202,7 +202,7 @@ const LeadsReport = () => {
         {/* Total Leads Entraram */}
         <div className="bg-[#14171B] border border-border-card rounded-2xl p-5 shadow-lg flex items-center justify-between group hover:border-gold-primary transition-colors">
           <div className="flex flex-col text-left">
-            <span className="text-[9px] font-black text-text-muted tracking-widest uppercase">Entrada de Leads (SDR)</span>
+            <span className="text-[9px] font-black text-text-muted tracking-widest uppercase">Entrada de Leads</span>
             <span className="text-2xl font-black text-white mt-2 mono-numbers">{totalLeadsEntrada}</span>
             <span className="text-[8px] text-emerald-400 font-bold mt-1">leads no funil inicial</span>
           </div>
@@ -212,7 +212,7 @@ const LeadsReport = () => {
         {/* Total Vendas Convertidas */}
         <div className="bg-[#14171B] border border-border-card rounded-2xl p-5 shadow-lg flex items-center justify-between group hover:border-gold-primary transition-colors">
           <div className="flex flex-col text-left">
-            <span className="text-[9px] font-black text-text-muted tracking-widest uppercase">Vendas Ganhas</span>
+            <span className="text-[9px] font-black text-text-muted tracking-widest uppercase">Vendas</span>
             <span className="text-2xl font-black text-emerald-400 mt-2 mono-numbers">{totalLeadsGanhos}</span>
             <span className="text-[8px] text-text-secondary font-bold mt-1">
               Conversão Geral:{' '}
@@ -227,7 +227,7 @@ const LeadsReport = () => {
         {/* Leads Desqualificados / Perdidos */}
         <div className="bg-[#14171B] border border-border-card rounded-2xl p-5 shadow-lg flex items-center justify-between group hover:border-gold-primary transition-colors">
           <div className="flex flex-col text-left">
-            <span className="text-[9px] font-black text-text-muted tracking-widest uppercase">Leads Perdidos (Perda)</span>
+            <span className="text-[9px] font-black text-text-muted tracking-widest uppercase">Leads Não Convertidos</span>
             <span className="text-2xl font-black text-rose-400 mt-2 mono-numbers">{totalPerdidos}</span>
             <span className="text-[8px] text-text-secondary font-bold mt-1">
               Taxa de Perda:{' '}
@@ -274,14 +274,22 @@ const LeadsReport = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222326] text-xs font-medium text-text-secondary">
-                {metrics && metrics.consultaFunnel.map((stage) => (
-                  <tr key={stage.name} className="hover:bg-[#1C150C]/10 transition-colors">
-                    <td className="py-3 font-semibold text-white uppercase text-[10px]">{stage.name}</td>
-                    <td className="py-3 text-right text-white font-bold mono-numbers">{stage.count}</td>
-                    <td className="py-3 text-right text-gold-primary font-bold mono-numbers">{formatPercent(stage.txConversao)}</td>
-                    <td className="py-3 text-right text-text-secondary font-bold mono-numbers">{formatCurrency(stage.custo)}</td>
-                  </tr>
-                ))}
+                {metrics && metrics.consultaFunnel.map((stage, idx, arr) => {
+                  let relativeConvRate = 100;
+                  if (idx > 0 && arr[idx - 1].count > 0) {
+                    relativeConvRate = (stage.count / arr[idx - 1].count) * 100;
+                  } else if (idx > 0) {
+                    relativeConvRate = 0;
+                  }
+                  return (
+                    <tr key={stage.name} className="hover:bg-[#1C150C]/10 transition-colors">
+                      <td className="py-3 font-semibold text-white uppercase text-[10px]">{stage.name}</td>
+                      <td className="py-3 text-right text-white font-bold mono-numbers">{stage.count}</td>
+                      <td className="py-3 text-right text-gold-primary font-bold mono-numbers">{formatPercent(relativeConvRate)}</td>
+                      <td className="py-3 text-right text-text-secondary font-bold mono-numbers">{formatCurrency(stage.custo)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -304,14 +312,22 @@ const LeadsReport = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222326] text-xs font-medium text-text-secondary">
-                {metrics && metrics.cirurgiaFunnel.map((stage) => (
-                  <tr key={stage.name} className="hover:bg-[#1C150C]/10 transition-colors">
-                    <td className="py-3 font-semibold text-white uppercase text-[10px]">{stage.name}</td>
-                    <td className="py-3 text-right text-white font-bold mono-numbers">{stage.count}</td>
-                    <td className="py-3 text-right text-gold-primary font-bold mono-numbers">{formatPercent(stage.txConversao)}</td>
-                    <td className="py-3 text-right text-text-secondary font-bold mono-numbers">{formatCurrency(stage.custo)}</td>
-                  </tr>
-                ))}
+                {metrics && metrics.cirurgiaFunnel.map((stage, idx, arr) => {
+                  let relativeConvRate = 100;
+                  if (idx > 0 && arr[idx - 1].count > 0) {
+                    relativeConvRate = (stage.count / arr[idx - 1].count) * 100;
+                  } else if (idx > 0) {
+                    relativeConvRate = 0;
+                  }
+                  return (
+                    <tr key={stage.name} className="hover:bg-[#1C150C]/10 transition-colors">
+                      <td className="py-3 font-semibold text-white uppercase text-[10px]">{stage.name}</td>
+                      <td className="py-3 text-right text-white font-bold mono-numbers">{stage.count}</td>
+                      <td className="py-3 text-right text-gold-primary font-bold mono-numbers">{formatPercent(relativeConvRate)}</td>
+                      <td className="py-3 text-right text-text-secondary font-bold mono-numbers">{formatCurrency(stage.custo)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -41,7 +41,7 @@ export const getCampaignsInsights = async (startDate, endDate) => {
     const insightsRes = await client.get(`/${formattedAdAccountId}/insights`, {
       params: {
         level: 'campaign',
-        fields: 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency',
+        fields: 'campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,reach,frequency,video_thruplay_watched_actions',
         time_range: JSON.stringify({ since: startDate, until: endDate }),
         limit: 100,
         access_token: accessToken

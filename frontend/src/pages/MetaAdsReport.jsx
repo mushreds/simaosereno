@@ -14,12 +14,29 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+const getDefaultDateRange = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  
+  const formatDate = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  
+  return {
+    startDate: formatDate(firstDay),
+    endDate: formatDate(lastDay)
+  };
+};
+
 const MetaAdsReport = () => {
-  // Período compatível com o print (Maio e Junho de 2026)
-  const [dateRange, setDateRange] = useState({
-    startDate: '2026-05-01',
-    endDate: '2026-06-30',
-  });
+  // Inicialização de período dinâmica (Mês Atual)
+  const [dateRange, setDateRange] = useState(getDefaultDateRange());
 
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -96,46 +113,34 @@ const MetaAdsReport = () => {
   }
 
   const summary = metrics ? metrics.summary : {};
-  const campaigns = metrics ? metrics.campaigns : [];
+  const campaigns = metrics ? (metrics.campaigns || []).filter(c => (c.spend || 0) > 0) : [];
   const dailyEvolution = metrics ? metrics.dailyEvolution : [];
 
-  // Configurações do Gráfico SVG de Linha Dupla
-  const svgWidth = 900;
-  const svgHeight = 240;
-  const paddingLeft = 55;
-  const paddingRight = 55;
-  const paddingTop = 20;
-  const paddingBottom = 40;
-  const graphWidth = svgWidth - paddingLeft - paddingRight;
-  const graphHeight = svgHeight - paddingTop - paddingBottom;
-
-  // Encontra máximos para escala dos eixos
-  const maxSpend = Math.max(...dailyEvolution.map(d => d.spend)) * 1.15 || 1;
-  const maxLeads = Math.max(...dailyEvolution.map(d => d.leads)) * 1.15 || 1;
-
-  // Gera pontos para Spend (Eixo Esquerdo - Dourado)
-  const spendPoints = dailyEvolution.map((d, index) => {
-    const x = paddingLeft + (index / (dailyEvolution.length - 1)) * graphWidth;
-    const y = paddingTop + graphHeight - (d.spend / maxSpend) * graphHeight;
-    return { x, y, spend: d.spend, date: d.formattedDate };
-  });
-
-  const spendPath = spendPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const spendAreaPath = spendPoints.length > 0 
-    ? `${spendPath} L ${spendPoints[spendPoints.length - 1].x} ${paddingTop + graphHeight} L ${spendPoints[0].x} ${paddingTop + graphHeight} Z`
-    : '';
-
-  // Gera pontos para Leads (Eixo Direito - Azul)
-  const leadsPoints = dailyEvolution.map((d, index) => {
-    const x = paddingLeft + (index / (dailyEvolution.length - 1)) * graphWidth;
-    const y = paddingTop + graphHeight - (d.leads / maxLeads) * graphHeight;
-    return { x, y, leads: d.leads, date: d.formattedDate };
-  });
-
-  const leadsPath = leadsPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-
-  // Determinar rótulos no eixo X (evita sobreposição)
-  const labelInterval = Math.max(1, Math.floor(dailyEvolution.length / 8));
+  // Mapeia o resultado principal da campanha de forma personalizada
+  const getCampaignResult = (camp) => {
+    const name = camp.name.toUpperCase();
+    if (name.includes('SITE') || name.includes('RMKT') || name.includes('LEAD') || name.includes('CADASTRO')) {
+      return {
+        label: 'Lead (Cadastro)',
+        value: camp.leads || 0
+      };
+    } else if (name.includes('VIDEO VIEW') || name.includes('THRUPLAY') || name.includes('TRUEPLAY')) {
+      return {
+        label: 'Thruplay',
+        value: camp.thruplays || 0
+      };
+    } else if (name.includes('VISITAS AO PERFIL') || name.includes('TRÁFEGO-IG') || name.includes('SEGUIDORES')) {
+      return {
+        label: 'Visitas ao Perfil',
+        value: camp.clicks || 0
+      };
+    } else {
+      return {
+        label: 'Resultado',
+        value: camp.leads || camp.clicks || 0
+      };
+    }
+  };
 
   return (
     <div className="w-full flex flex-col gap-6 select-none p-6 bg-[#0B0B0C] min-h-screen text-text-primary">
@@ -188,22 +193,31 @@ const MetaAdsReport = () => {
               { label: 'Mês', val: 30 },
               { label: '3M', val: 90 },
             ].map((item) => {
-              const today = new Date('2026-06-12');
-              let start = new Date('2026-06-12');
+              const today = new Date();
+              let start = new Date(today);
               if (item.val > 0) {
                 start.setDate(today.getDate() - (item.val === 1 ? 1 : item.val - 1));
               }
-              const startStr = start.toISOString().split('T')[0];
-              const endStr = today.toISOString().split('T')[0];
+              
+              const formatDateStr = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+              };
+
+              const startStr = formatDateStr(start);
+              const endStr = formatDateStr(today);
               
               let isActive = dateRange.startDate === startStr && dateRange.endDate === endStr;
               if (item.label === 'Mês') {
-                isActive = dateRange.startDate === '2026-05-01' && dateRange.endDate === '2026-06-30';
+                const currentMonthRange = getDefaultDateRange();
+                isActive = dateRange.startDate === currentMonthRange.startDate && dateRange.endDate === currentMonthRange.endDate;
               }
 
               const handleQuickFilter = () => {
                 if (item.label === 'Mês') {
-                  setDateRange({ startDate: '2026-05-01', endDate: '2026-06-30' });
+                  setDateRange(getDefaultDateRange());
                 } else {
                   setDateRange({ startDate: startStr, endDate: endStr });
                 }
@@ -352,147 +366,7 @@ const MetaAdsReport = () => {
 
       </div>
 
-      {/* Grid de Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Gráfico de Evolução (Investimento vs Leads) */}
-        <div className="lg:col-span-2 bg-[#14171B] border border-border-card rounded-2xl p-5 shadow-lg flex flex-col">
-          <div className="flex items-center justify-between mb-4 text-left">
-            <div>
-              <h3 className="text-xs font-black tracking-wider text-white uppercase">Evolução Diária da Campanha</h3>
-              <span className="text-[9px] text-text-muted">Investimento (Dourado, eixo esq.) vs Leads (Azul, eixo dir.)</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-1.5 rounded-sm bg-gold-primary" />
-                <span className="text-[8px] font-bold text-text-secondary">Gasto</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-1.5 rounded-sm bg-[#D3DDEE]" />
-                <span className="text-[8px] font-bold text-text-secondary">Leads</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="flex-1 min-h-[200px] flex items-center justify-center">
-            {dailyEvolution.length > 0 ? (
-              <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full select-none">
-                <defs>
-                  {/* Gradiente para área do Gasto */}
-                  <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#817566" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#817566" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Linhas de Grade de Fundo (Horizontal) */}
-                {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
-                  const y = paddingTop + ratio * graphHeight;
-                  return (
-                    <line 
-                      key={i} 
-                      x1={paddingLeft} 
-                      y1={y} 
-                      x2={paddingLeft + graphWidth} 
-                      y2={y} 
-                      stroke="#24282F" 
-                      strokeWidth="1" 
-                      strokeDasharray="4 4" 
-                    />
-                  );
-                })}
-
-                {/* Preenchimento de Área (Gasto) */}
-                {spendAreaPath && (
-                  <path d={spendAreaPath} fill="url(#spendGradient)" />
-                )}
-
-                {/* Linhas Principais */}
-                {spendPath && (
-                  <path d={spendPath} fill="none" stroke="#817566" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                )}
-                {leadsPath && (
-                  <path d={leadsPath} fill="none" stroke="#D3DDEE" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                )}
-
-                {/* Eixo X: Rótulos das Datas */}
-                {dailyEvolution.map((d, index) => {
-                  if (index % labelInterval !== 0 && index !== dailyEvolution.length - 1) return null;
-                  const x = paddingLeft + (index / (dailyEvolution.length - 1)) * graphWidth;
-                  return (
-                    <g key={index}>
-                      <line x1={x} y1={paddingTop + graphHeight} x2={x} y2={paddingTop + graphHeight + 4} stroke="#24282F" strokeWidth="1" />
-                      <text 
-                        x={x} 
-                        y={paddingTop + graphHeight + 16} 
-                        fill="#686868" 
-                        fontSize="8.5" 
-                        fontWeight="bold" 
-                        textAnchor="middle"
-                      >
-                        {d.formattedDate}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* Eixo Esquerdo: Valores de Spend */}
-                <text x={paddingLeft - 8} y={paddingTop + 4} fill="#817566" fontSize="8.5" fontWeight="bold" textAnchor="end">
-                  {formatCurrencyCompact(maxSpend)}
-                </text>
-                <text x={paddingLeft - 8} y={paddingTop + graphHeight} fill="#817566" fontSize="8.5" fontWeight="bold" textAnchor="end">
-                  R$ 0
-                </text>
-
-                {/* Eixo Direito: Valores de Leads */}
-                <text x={paddingLeft + graphWidth + 8} y={paddingTop + 4} fill="#D3DDEE" fontSize="8.5" fontWeight="bold" textAnchor="start">
-                  {Math.round(maxLeads)} L
-                </text>
-                <text x={paddingLeft + graphWidth + 8} y={paddingTop + graphHeight} fill="#D3DDEE" fontSize="8.5" fontWeight="bold" textAnchor="start">
-                  0 L
-                </text>
-              </svg>
-            ) : (
-              <span className="text-[10px] text-text-muted">Sem dados disponíveis</span>
-            )}
-          </div>
-        </div>
-
-        {/* Divisão de Investimento por Campanha */}
-        <div className="bg-[#14171B] border border-border-card rounded-2xl p-5 shadow-lg flex flex-col justify-between">
-          <div className="text-left mb-4">
-            <h3 className="text-xs font-black tracking-wider text-white uppercase">Divisão de Investimento</h3>
-            <span className="text-[9px] text-text-muted">Percentual de verba alocado por campanha</span>
-          </div>
-
-          <div className="flex-1 flex flex-col gap-4 justify-center">
-            {campaigns.map((camp) => {
-              const sharePercent = summary.totalSpend > 0 ? (camp.spend / summary.totalSpend) * 100 : 0;
-              return (
-                <div key={camp.id} className="flex flex-col gap-1 text-left">
-                  <div className="flex items-center justify-between text-[9px] font-bold">
-                    <span className="text-text-secondary truncate max-w-[170px]" title={camp.name}>
-                      {camp.name.replace('Dr. Simão - ', '')}
-                    </span>
-                    <span className="mono-numbers text-gold-primary">{sharePercent.toFixed(1)}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-[#1E232A] rounded-full overflow-hidden border border-[#24282F]">
-                    <div 
-                      className="h-full bg-gold-gradient rounded-full" 
-                      style={{ width: `${sharePercent}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[7px] text-text-muted font-semibold">
-                    <span>Gasto: {formatCurrencyCompact(camp.spend)}</span>
-                    <span>Leads: {camp.leads}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-      </div>
 
       {/* Tabela de Detalhamento das Campanhas */}
       <div className="bg-[#14171B] border border-border-card rounded-2xl p-5 shadow-lg">
@@ -506,74 +380,40 @@ const MetaAdsReport = () => {
             <thead>
               <tr className="border-b border-border-card text-text-muted uppercase tracking-widest font-black text-[8px]">
                 <th className="py-3 px-2">Campanha</th>
-                <th className="py-3 px-2 text-center hidden md:table-cell">Status</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">Orçamento</th>
+                <th className="py-3 px-2 text-center">Status</th>
                 <th className="py-3 px-2 text-right">Gasto</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">Impressões</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">Cliques</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">CTR</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">CPC</th>
-                <th className="py-3 px-2 text-right">Leads</th>
-                <th className="py-3 px-2 text-right">CPL</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">Vendas</th>
-                <th className="py-3 px-2 text-right hidden md:table-cell">VGV CRM</th>
-                <th className="py-3 px-2 text-right text-gold-primary">ROAS</th>
+                <th className="py-3 px-2 text-right">Impressões</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1D2127]">
-              {campaigns.map((camp) => (
-                <tr key={camp.id} className="hover:bg-[#1E232A]/40 transition-colors">
-                  <td className="py-3.5 px-2 font-bold text-white max-w-[120px] sm:max-w-[200px] truncate" title={camp.name}>
-                    {camp.name.replace('Dr. Simão - ', '')}
-                  </td>
-                  <td className="py-3.5 px-2 text-center hidden md:table-cell">
-                    <div className="flex items-center justify-center">
-                      {camp.status === 'ACTIVE' ? (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold text-[7.5px] uppercase tracking-wider">
-                          <CheckCircle className="w-2.5 h-2.5" /> Ativa
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 font-extrabold text-[7.5px] uppercase tracking-wider">
-                          <PauseCircle className="w-2.5 h-2.5" /> Pausada
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers font-medium text-text-secondary hidden md:table-cell">
-                    {camp.budget > 0 ? formatCurrencyCompact(camp.budget) : '—'}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers font-medium text-text-secondary">
-                    {formatCurrencyCompact(camp.spend)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary hidden md:table-cell">
-                    {formatNumber(camp.impressions)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary hidden md:table-cell">
-                    {formatNumber(camp.clicks)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary hidden md:table-cell">
-                    {formatPercent(camp.ctr)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary hidden md:table-cell">
-                    {formatCurrency(camp.cpc)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-white font-bold">
-                    {formatNumber(camp.leads)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary">
-                    {formatCurrency(camp.cpl)}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-emerald-400 font-bold hidden md:table-cell">
-                    {camp.conversions}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary hidden md:table-cell">
-                    {camp.vgv > 0 ? formatCurrencyCompact(camp.vgv) : 'R$ 0'}
-                  </td>
-                  <td className="py-3.5 px-2 text-right mono-numbers font-extrabold text-gold-primary">
-                    {camp.roas > 0 ? formatRoas(camp.roas) : '0,00x'}
-                  </td>
-                </tr>
-              ))}
+              {campaigns.map((camp) => {
+                return (
+                  <tr key={camp.id} className="hover:bg-[#1E232A]/40 transition-colors">
+                    <td className="py-3.5 px-2 font-bold text-white max-w-[120px] sm:max-w-[200px] truncate" title={camp.name}>
+                      {camp.name.replace('Dr. Simão - ', '')}
+                    </td>
+                    <td className="py-3.5 px-2 text-center">
+                      <div className="flex items-center justify-center">
+                        {camp.status === 'ACTIVE' ? (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold text-[7.5px] uppercase tracking-wider">
+                            <CheckCircle className="w-2.5 h-2.5" /> Ativa
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 font-extrabold text-[7.5px] uppercase tracking-wider">
+                            <PauseCircle className="w-2.5 h-2.5" /> Pausada
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-2 text-right mono-numbers font-medium text-text-secondary">
+                      {formatCurrencyCompact(camp.spend)}
+                    </td>
+                    <td className="py-3.5 px-2 text-right mono-numbers text-text-secondary">
+                      {formatNumber(camp.impressions)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

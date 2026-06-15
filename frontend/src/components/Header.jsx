@@ -150,17 +150,6 @@ const Header = ({ metrics, config, dateRange, onDateChange }) => {
             </button>
           )}
         </div>
-
-        {/* ROAS Card */}
-        <div className="flex items-center justify-between bg-bg-secondary border border-border-card rounded-xl px-4 py-2.5 w-48 shadow-lg relative overflow-hidden group hover:border-gold-border transition-colors duration-200">
-          <div className="flex flex-col text-left">
-            <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">ROAS Geral</span>
-            <span className="text-xl font-bold text-gold-primary mt-0.5 group-hover:text-gold-hover transition-colors">
-              {roas.toFixed(2).replace('.', ',')}
-            </span>
-          </div>
-          <div className="absolute right-0 bottom-0 top-0 w-1 bg-gold-primary shadow-[0_0_10px_rgba(201,169,110,0.5)]" />
-        </div>
       </div>
     </header>
   );
